@@ -1,0 +1,72 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Feedback System
+Resources:
+  ApiGateway:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: Prod
+  LandingPageFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: LandingPageFunction
+      Handler: app.lambda_handler
+      Runtime: python3.10
+      Events:
+        ApiEvent:
+          Type: Api
+          Properties:
+            Path: /
+            Method: get
+            RestApiId:
+              Ref: ApiGateway
+    Metadata:
+      SamResourceId: LandingPageFunction
+  RecordAndConfirmFeedbackFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: RecordAndConfirmFeedbackFunction
+      Handler: app.lambda_handler
+      Runtime: python3.10
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName:
+            Ref: FeedbackTable
+      - SNSPublishMessagePolicy:
+          TopicName:
+            Fn::GetAtt:
+            - FeedbackTopic
+            - TopicName
+      Environment:
+        Variables:
+          TABLE_NAME:
+            Ref: FeedbackTable
+          TOPIC_ARN:
+            Ref: FeedbackTopic
+      Events:
+        ApiEvent:
+          Type: Api
+          Properties:
+            Path: /feedback
+            Method: post
+            RestApiId:
+              Ref: ApiGateway
+    Metadata:
+      SamResourceId: RecordAndConfirmFeedbackFunction
+  FeedbackTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+      - AttributeName: id
+        AttributeType: S
+      KeySchema:
+      - AttributeName: id
+        KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+  FeedbackTopic:
+    Type: AWS::SNS::Topic
+Outputs:
+  ApiUrl:
+    Description: URL of the API Gateway
+    Value:
+      Fn::Sub: https://${ApiGateway}.execute-api.${AWS::Region}.amazonaws.com/Prod/

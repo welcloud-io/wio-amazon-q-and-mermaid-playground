@@ -1,0 +1,43 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Serverless Feedback Application
+
+Resources:
+  FeedbackFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: app.lambda_handler
+      Runtime: python3.8
+      Events:
+        ApiEvent:
+          Type: Api
+          Properties:
+            Path: /
+            Method: ANY
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref FeedbackTable
+        - SNSPublishMessagePolicy:
+            TopicName: !GetAtt FeedbackTopic.TopicName
+
+  FeedbackTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: email
+          AttributeType: S
+      KeySchema:
+        - AttributeName: email
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+
+  FeedbackTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: FeedbackConfirmation
+
+Outputs:
+  ApiUrl:
+    Description: URL of the API endpoint
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"

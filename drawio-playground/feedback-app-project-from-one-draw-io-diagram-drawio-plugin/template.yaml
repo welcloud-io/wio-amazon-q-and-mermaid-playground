@@ -1,0 +1,60 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Feedback Application
+
+Resources:
+  FeedbackFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: app.lambda_handler
+      Runtime: python3.10
+      Environment:
+        Variables:
+          SNS_TOPIC_ARN: !Ref FeedbackTopic
+          DYNAMODB_TABLE: !Ref FeedbackTable
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref FeedbackTable
+        - SNSPublishMessagePolicy:
+            TopicName: !GetAtt FeedbackTopic.TopicName
+      Events:
+        LandingPageEvent:
+          Type: Api
+          Properties:
+            Path: /
+            Method: get
+            RestApiId: !Ref FeedbackApi
+        FeedbackSubmissionEvent:
+          Type: Api
+          Properties:
+            Path: /feedback
+            Method: post
+            RestApiId: !Ref FeedbackApi
+
+  FeedbackApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: Prod
+      Cors:
+        AllowMethods: "'GET,POST,OPTIONS'"
+        AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+        AllowOrigin: "'*'"
+
+  FeedbackTable:
+    Type: AWS::Serverless::SimpleTable
+    Properties:
+      PrimaryKey:
+        Name: id
+        Type: String
+
+  FeedbackTopic:
+    Type: AWS::SNS::Topic
+
+Outputs:
+  ApiUrl:
+    Description: URL of the API endpoint
+    Value: !Sub "https://${FeedbackApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/feedback"
+  FeedbackTopicArn:
+    Description: ARN of the SNS Topic
+    Value: !Ref FeedbackTopic
